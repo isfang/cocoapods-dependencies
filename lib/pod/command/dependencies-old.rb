@@ -87,9 +87,7 @@ module Pod
             )
 
             specs = config.with_changes(skip_repo_update: !@repo_update) do
-
-              tmppp = @repo_update || @podspec
-              analyzer.analyze(tmppp).specs_by_target.values.flatten(1)
+              analyzer.analyze(@repo_update || @podspec).specs_by_target.values.flatten(1)
             end
 
             lockfile = Lockfile.generate(podfile, specs, {})
@@ -98,46 +96,20 @@ module Pod
           lockfile.to_hash['PODS']
         end
       end
-      
-      def validation_dir
-        @validation_dir ||= Pathname(Dir.mktmpdir(['CocoaPods-Lint-', "-#{output_file_basename}"]))
-      end
-
-      def create_app_project
-        app_project = Xcodeproj::Project.new(validation_dir + 'App.xcodeproj')
-        app_target = Pod::Generator::AppTargetHelper.add_app_target(app_project, :ios, '8.0')
-        Pod::Generator::AppTargetHelper.add_swift_version(app_target, '4.0'.freeze)
-        app_project.save
-        app_project.recreate_user_schemes
-      end
-  
 
       def podfile
-        create_app_project
         @podfile ||= begin
           if podspec = @podspec
-
             platform = podspec.available_platforms.first
             platform_name = platform.name
             platform_version = platform.deployment_target.to_s
-            project_dir = validation_dir + 'App.xcodeproj'
             source_urls = Config.instance.sources_manager.all.map(&:url).compact
             Podfile.new do
-              # install! 'cocoapods', integrate_targets: false, warn_for_multiple_pod_sources: false
-              # source_urls.each { |u| source(u) }
-              # platform platform_name, platform_version
-              # pod podspec.name, podspec: podspec.defined_in_file
-              # target 'Dependencies'
-
-              install! 'cocoapods', :deterministic_uuids => false
-              inhibit_all_warnings!
+              install! 'cocoapods', integrate_targets: false, warn_for_multiple_pod_sources: false
               source_urls.each { |u| source(u) }
-              project project_dir
-              target 'App' do
-                platform platform_name, platform_version
-                pod podspec.name, :podspec => podspec.to_s, :inhibit_warnings => false
-              end
-
+              platform platform_name, platform_version
+              pod podspec.name, podspec: podspec.defined_in_file
+              target 'Dependencies'
             end
           else
             verify_podfile_exists!
@@ -150,7 +122,6 @@ module Pod
         if @podspec
           require 'tmpdir'
           Sandbox.new(Dir.mktmpdir)
-          # Sandbox.new(config.sandbox_root)
         else
           config.sandbox
         end
@@ -228,7 +199,6 @@ module Pod
 		    File.open("#{output_file_basename}.yaml","w") do |file|
 			    file.write dependencies.to_yaml
 		    end
-
 	    end
 
       def graphviz_image_output
